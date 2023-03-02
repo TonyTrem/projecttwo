@@ -6,9 +6,8 @@
     <div class="listing">
         <p>Image: {{ listing.image }}</p>
         <p>{{ listing.description }}</p>
-        <p>Current bid: {{ listing.current_bid }}</p>
-        <p>Listed by: {{ listing.user }}, on {{ listing.date }}</p>
-        <p>Category: {{ listing.category }}</p>
-        
+        <p>Current bid: ${{ listing.current_bid }}</p>
+        <p>Listed by: {{ listing.user }}, on {{ listing.creation_date }}</p>
+        <p>Category: {{ listing.category }}</p>        
     </div>
 {% endblock %}

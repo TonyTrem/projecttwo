@@ -6,8 +6,10 @@ from django.urls import reverse
 from django import forms
 from datetime import datetime
 
-from .models import User, Listing
+from .models import User, Listing, Bid
 
+class BidForm(forms.Form):
+    bid = forms.DecimalField(label="Bid", max_digits=10, decimal_places=2)
 
 class ListingForm(forms.Form):
     title = forms.CharField(label="Title", max_length=64)
@@ -20,7 +22,6 @@ def index(request):
     return render(request, "auctions/index.html", {
         "listings": Listing.objects.all()
     })
-
 
 def login_view(request):
     if request.method == "POST":
@@ -98,4 +99,33 @@ def create(request):
     else:
         return render(request, "auctions/create.html", {
             "form": ListingForm()
+        })
+    
+def createbid(request, listing_id):
+    if request.method == "POST":
+        form = BidForm(request.POST)
+        if form.is_valid():
+            bid = form.cleaned_data["bid"]
+            user = User.objects.get(pk=request.user.id)
+            listing = Listing.objects.get(pk=listing_id)
+            if bid > listing.current_bid:
+                listing.current_bid = bid
+                listing.save()
+                bid = Bid(user=user, listing=listing, bid=bid)
+                bid.save()
+                return HttpResponseRedirect(reverse("listing", args=(listing_id,)))
+            else:
+                return render(request, "auctions/listing.html", {
+                    "listing": Listing.objects.get(pk=listing_id),
+                    "message": "Bid must be higher than current bid."
+                })
+        else:
+            return render(request, "auctions/listing.html", {
+                "listing": Listing.objects.get(pk=listing_id),
+                "form": form
+            })
+    else:
+        return render(request, "auctions/listing.html", {
+            "listing": Listing.objects.get(pk=listing_id),
+            "form": BidForm()
         })
