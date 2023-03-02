@@ -3,12 +3,23 @@ from django.db import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
+from django import forms
+from datetime import datetime
 
-from .models import User
+from .models import User, Listing
 
+
+class ListingForm(forms.Form):
+    title = forms.CharField(label="Title", max_length=64)
+    description = forms.CharField(label="Description", max_length=64)
+    starting_bid = forms.IntegerField(label="Starting Bid")
+    image_url = forms.CharField(label="Image URL", max_length=64)
+    category = forms.CharField(label="Category", max_length=64)
 
 def index(request):
-    return render(request, "auctions/index.html")
+    return render(request, "auctions/index.html", {
+        "listings": Listing.objects.all()
+    })
 
 
 def login_view(request):
@@ -61,3 +72,30 @@ def register(request):
         return HttpResponseRedirect(reverse("index"))
     else:
         return render(request, "auctions/register.html")
+    
+def listing(request, listing_id):
+    return render(request, "auctions/listing.html", {
+        "listing": Listing.objects.get(pk=listing_id)
+    })
+
+def create(request):
+    if request.method == "POST":
+        form = ListingForm(request.POST)
+        if form.is_valid():
+            title = form.cleaned_data["title"]
+            description = form.cleaned_data["description"]
+            starting_bid = form.cleaned_data["starting_bid"]
+            image_url = form.cleaned_data["image_url"]
+            category = form.cleaned_data["category"]
+            user = User.objects.get(pk=request.user.id)
+            listing = Listing(title=title, description=description, starting_bid=starting_bid, image_url=image_url, category=category, user=user, current_bid=starting_bid, active=True, creation_date=datetime.now)
+            listing.save()
+            return HttpResponseRedirect(reverse("index"))
+        else:
+            return render(request, "auctions/create.html", {
+                "form": form
+            })
+    else:
+        return render(request, "auctions/create.html", {
+            "form": ListingForm()
+        })
