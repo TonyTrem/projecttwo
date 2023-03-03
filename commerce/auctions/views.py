@@ -6,10 +6,13 @@ from django.urls import reverse
 from django import forms
 from datetime import datetime
 
-from .models import User, Listing, Bid
+from .models import User, Listing, Bid, Comment, Watchlist
+
+class CommentForm(forms.Form):
+    comment = forms.CharField(label="Comment", max_length=64)
 
 class BidForm(forms.Form):
-    bid = forms.DecimalField(label="Bid", max_digits=10, decimal_places=2)
+    bid = forms.IntegerField(label="Bid")
 
 class ListingForm(forms.Form):
     title = forms.CharField(label="Title", max_length=64)
@@ -75,7 +78,31 @@ def register(request):
         return render(request, "auctions/register.html")
     
 def listing(request, listing_id):
-    return render(request, "auctions/listing.html", {
+    if request.method == "POST":
+        form = BidForm(request.POST)
+        if form.is_valid():
+            bid = form.cleaned_data["bid"]
+            listing = Listing.objects.get(pk=listing_id)
+            if bid > listing.current_bid:
+                listing.current_bid = bid
+                listing.bid_count += 1
+                listing.save()
+                user = User.objects.get(pk=request.user.id)
+                bid = Bid(user=user, listing=listing, bid=bid)
+                bid.save()
+                return HttpResponseRedirect(reverse("listing", args=[listing_id]))
+            else:
+                return render(request, "auctions/listing.html", {
+                    "listing": Listing.objects.get(pk=listing_id),
+                    "message": "Bid must be higher than current bid."
+                })
+        else:
+            return render(request, "auctions/listing.html", {
+                "listing": Listing.objects.get(pk=listing_id),
+                "form": form
+            })
+    else:
+        return render(request, "auctions/listing.html", {
         "listing": Listing.objects.get(pk=listing_id)
     })
 
@@ -89,7 +116,7 @@ def create(request):
             image_url = form.cleaned_data["image_url"]
             category = form.cleaned_data["category"]
             user = User.objects.get(pk=request.user.id)
-            listing = Listing(title=title, description=description, starting_bid=starting_bid, image_url=image_url, category=category, user=user, current_bid=starting_bid, active=True, creation_date=datetime.now)
+            listing = Listing(title=title, description=description, starting_bid=starting_bid, image_url=image_url, category=category, user=user, creation_date=datetime.now(), active=True)
             listing.save()
             return HttpResponseRedirect(reverse("index"))
         else:
@@ -100,25 +127,47 @@ def create(request):
         return render(request, "auctions/create.html", {
             "form": ListingForm()
         })
-    
-def createbid(request, listing_id):
+
+def categories(request):
+    return render(request, "auctions/categories.html", {
+        "categories": Listing.objects.values_list('category', flat=True).distinct()
+    })
+
+def category(request, category):
+    return render(request, "auctions/category.html", {
+        "listings": Listing.objects.filter(category=category)
+    })
+
+def watchlist(request):
+    user = User.objects.get(pk=request.user.id)
+    return render(request, "auctions/watchlist.html", {
+        "listings": Watchlist.objects.filter(user=user)
+    })
+
+def add_watchlist(request, listing_id):
+    listing = Listing.objects.get(pk=listing_id)
+    user = User.objects.get(pk=request.user.id)
+    watchlist = Watchlist(user=user, listing=listing)
+    watchlist.save()
+    return HttpResponseRedirect(reverse("listing", args=[listing_id]))
+
+def remove_watchlist(request, listing_id):
+    listing = Listing.objects.get(pk=listing_id)
+    user = User.objects.get(pk=request.user.id)
+    watchlist = Watchlist.objects.get(user=user, listing=listing)
+    watchlist.delete()
+    return HttpResponseRedirect(reverse("listing", args=[listing_id]))
+
+def comment(request, listing_id):
     if request.method == "POST":
-        form = BidForm(request.POST)
+        form = CommentForm(request.POST)
         if form.is_valid():
-            bid = form.cleaned_data["bid"]
-            user = User.objects.get(pk=request.user.id)
+            comment = form.cleaned_data["comment"]
             listing = Listing.objects.get(pk=listing_id)
-            if bid > listing.current_bid:
-                listing.current_bid = bid
-                listing.save()
-                bid = Bid(user=user, listing=listing, bid=bid)
-                bid.save()
-                return HttpResponseRedirect(reverse("listing", args=(listing_id,)))
-            else:
-                return render(request, "auctions/listing.html", {
-                    "listing": Listing.objects.get(pk=listing_id),
-                    "message": "Bid must be higher than current bid."
-                })
+            user = User.objects.get(pk=request.user.id)
+            comment = Comment(user=user, listing=listing, comment=comment)
+            comment.save()
+            return HttpResponseRedirect(reverse("listing", args=[listing_id]))
         else:
             return render(request, "auctions/listing.html", {
                 "listing": Listing.objects.get(pk=listing_id),
@@ -126,6 +175,39 @@ def createbid(request, listing_id):
             })
     else:
         return render(request, "auctions/listing.html", {
-            "listing": Listing.objects.get(pk=listing_id),
-            "form": BidForm()
-        })
+        "listing": Listing.objects.get(pk=listing_id)
+    })
+
+def close(request, listing_id):
+    listing = Listing.objects.get(pk=listing_id)
+    listing.active = False
+    listing.save()
+    return HttpResponseRedirect(reverse("listing", args=[listing_id]))
+
+def closed(request):
+    return render(request, "auctions/closed.html", {
+        "listings": Listing.objects.filter(active=False)
+    })
+
+def winner(request, listing_id):
+    listing = Listing.objects.get(pk=listing_id)
+    winner = Bid.objects.filter(listing=listing).order_by('-bid').first()
+    return render(request, "auctions/winner.html", {
+        "listing": listing,
+        "winner": winner
+    })
+
+def my_listings(request):
+    return render(request, "auctions/my_listings.html", {
+        "listings": Listing.objects.filter(user=request.user.id)
+    })
+
+def my_bids(request):
+    return render(request, "auctions/my_bids.html", {
+        "listings": Listing.objects.filter(bid__user=request.user.id)
+    })
+
+def my_comments(request):
+    return render(request, "auctions/my_comments.html", {
+        "comments": Comment.objects.filter(user=request.user.id)
+    })
