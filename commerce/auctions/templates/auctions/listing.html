@@ -3,17 +3,35 @@
 {% block body %}
     <h2>Listing: {{ listing.title }}</h2>
 
-    <div class="listing">
-        <p>Image: <img src="{{ listing.image_url }}"></p>
-        <p>{{ listing.description }}</p>
-        <p>Current bid: ${{ listing.current_bid }}</p>
-        <!-- Add or remove from watchlist -->
-        {% if listing in watchlist %}
-            <a href="{% url 'remove_watchlist' listing.id %}">Remove from watchlist</a>
-        {% else %}
-            <a href="{% url 'add_watchlist' listing.id %}">Add to watchlist</a>
-        {% endif %}
-        <p>Listed by: {{ listing.user }}, on {{ listing.creation_date }}</p>
-        <p>Category: {{ listing.category }}</p>             
+    <div class="full-listing">
+        <div class="listing-img">
+            <img src="{{ listing.image_url }}">
+        </div>
+        <div class="listing-info">
+            <div class="listing-title">
+                <h3>{{ listing.title }}</h3>
+            </div>
+            <div class="listing-description">
+                <p>{{ listing.description }}</p>
+            </div>
+            <div class="listing-current-bid">
+                <p>Current bid: {{ listing.current_bid }}</p>
+            </div>
+            <div class="listing-creation-date">
+                <p>Posted on: {{ listing.creation_date }}</p>
+            </div>
+            <div class="listing-category">
+                <p>Category: {{ listing.category }}</p>
+            </div>
+            <div class="listing-owner">
+                <p>Posted by: {{ listing.owner }}</p>
+            </div>
+            <div class="listing-watchlist">
+                {% if listing in watchlist %}
+                    <p>On watchlist</p>
+                {% else %}
+                    <p>Not on watchlist</p>
+                {% endif %}
+            </div>
     </div>
 {% endblock %}
